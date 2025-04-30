@@ -24,6 +24,8 @@ If you want only devices where every day in the range had at least 2 hours of ap
 
 ==================
 
+Give me list of all the apps that are not used in devices but are installed on it ?
+
 To get a list of all the apps that are installed on devices but have never been used (i.e., no usage records in app_daily_usage), you can use a query that finds installed apps with no corresponding usage entries.
 
 Here is the SQL query:
