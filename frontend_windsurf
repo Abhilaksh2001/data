@@ -1,0 +1,169 @@
+"use client";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { FixedSizeGrid as Grid } from "react-window";
+import { Dialog } from "primereact/dialog";
+import { Card } from "primereact/card";
+import { classNames } from "primereact/utils";
+import { Paginator } from "primereact/paginator";
+import "primereact/resources/themes/lara-light-blue/theme.css";
+import "primereact/resources/primereact.min.css";
+import "primeflex/primeflex.css";
+
+function useResponsiveColumns() {
+  const [columns, setColumns] = useState(6);
+  useEffect(() => {
+    const calcCols = () => {
+      if (window.innerWidth < 768) setColumns(2);
+      else if (window.innerWidth < 1024) setColumns(4);
+      else setColumns(6);
+    };
+    calcCols();
+    window.addEventListener("resize", calcCols);
+    return () => window.removeEventListener("resize", calcCols);
+  }, []);
+  return columns;
+}
+
+const DeviceCard = React.memo(({ device, onClick }) => (
+  <Card
+    className="m-2 cursor-pointer hover:shadow-4 transition-shadow"
+    title={device.name}
+    onClick={onClick}
+    style={{ minHeight: 220, display: "flex", flexDirection: "column", alignItems: "center" }}
+  >
+    <img
+      src={device.imageUrl}
+      alt={device.name}
+      style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8 }}
+    />
+  </Card>
+));
+
+function DeviceDetailsModal({ device, visible, onHide }) {
+  if (!device) return null;
+  return (
+    <Dialog
+      visible={visible}
+      onHide={onHide}
+      header={device.name}
+      position="right"
+      style={{ width: "90vw", maxWidth: 800 }}
+      className="p-fluid"
+      blockScroll
+      dismissableMask
+    >
+      <div className="flex flex-column md:flex-row gap-4">
+        <div className="flex justify-content-center align-items-center" style={{ flex: 1 }}>
+          <img
+            src={device.imageUrl}
+            alt={device.name}
+            style={{ maxWidth: 300, width: "100%", borderRadius: 8 }}
+          />
+        </div>
+        <div className="flex flex-column gap-2" style={{ flex: 2 }}>
+          <div><b>Model:</b> {device.details.model}</div>
+          <div><b>OS:</b> {device.details.os}</div>
+          <div><b>Serial:</b> {device.details.serial}</div>
+          <div><b>Status:</b> {device.details.status}</div>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+export default function DeviceGrid() {
+  const columns = useResponsiveColumns();
+  const [devices, setDevices] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(0); // 0-based
+  const [rows, setRows] = useState(50); // page size
+  const [selected, setSelected] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/devices?page=${page + 1}&pageSize=${rows}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then((data) => {
+        if (!ignore) {
+          setDevices(data.devices || []);
+          setTotal(data.total || 0);
+        }
+      })
+      .catch((e) => {
+        if (!ignore) setError(e.message);
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+    return () => { ignore = true; };
+  }, [page, rows]);
+
+  const rowCount = Math.ceil(devices.length / columns);
+  const gridWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const cardWidth = Math.floor(gridWidth / columns);
+
+  const Cell = useCallback(
+    ({ columnIndex, rowIndex, style }) => {
+      const idx = rowIndex * columns + columnIndex;
+      if (idx >= devices.length) return null;
+      const device = devices[idx];
+      return (
+        <div style={style} key={device.id}>
+          <DeviceCard
+            device={device}
+            onClick={() => {
+              setSelected(device);
+              setModalOpen(true);
+            }}
+          />
+        </div>
+      );
+    },
+    [columns, devices]
+  );
+
+  return (
+    <div className="p-4">
+      {loading && <div className="p-text-center">Loading...</div>}
+      {error && <div className="p-error">{error}</div>}
+      {!loading && !error && (
+        <>
+          <Grid
+            columnCount={columns}
+            columnWidth={cardWidth}
+            height={window.innerHeight - 120}
+            rowCount={rowCount}
+            rowHeight={250}
+            width={gridWidth - 32}
+          >
+            {Cell}
+          </Grid>
+          <Paginator
+            first={page * rows}
+            rows={rows}
+            totalRecords={total}
+            onPageChange={(e) => {
+              setPage(Math.floor(e.first / e.rows));
+              setRows(e.rows);
+            }}
+            rowsPerPageOptions={[25, 50, 100]}
+            className="mt-4"
+          />
+        </>
+      )}
+      <DeviceDetailsModal
+        device={selected}
+        visible={modalOpen}
+        onHide={() => setModalOpen(false)}
+      />
+    </div>
+  );
+}
