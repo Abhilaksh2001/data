@@ -1,0 +1,127 @@
+-- Full PostgreSQL Schema for Android Device Management Solution
+
+-- Roles
+CREATE TABLE role (
+    role_id SERIAL PRIMARY KEY,
+    role_name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT
+);
+
+-- Users
+CREATE TABLE "user" (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role_id INTEGER NOT NULL REFERENCES role(role_id),
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Groups
+CREATE TABLE user_group (
+    user_group_id SERIAL PRIMARY KEY,
+    group_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE user_group_membership (
+    user_group_id INTEGER NOT NULL REFERENCES user_group(user_group_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_group_id, user_id)
+);
+
+-- Devices
+CREATE TABLE device (
+    device_id SERIAL PRIMARY KEY,
+    serial_number VARCHAR(100) NOT NULL UNIQUE,
+    model VARCHAR(100),
+    manufacturer VARCHAR(100),
+    os_version VARCHAR(50),
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    assigned_user_id INTEGER REFERENCES "user"(user_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Device Groups
+CREATE TABLE device_group (
+    device_group_id SERIAL PRIMARY KEY,
+    group_name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE device_group_membership (
+    device_group_id INTEGER NOT NULL REFERENCES device_group(device_group_id) ON DELETE CASCADE,
+    device_id INTEGER NOT NULL REFERENCES device(device_id) ON DELETE CASCADE,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_group_id, device_id)
+);
+
+-- Tags for Devices
+CREATE TABLE tag (
+    tag_id SERIAL PRIMARY KEY,
+    tag_name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE device_tag (
+    device_id INTEGER NOT NULL REFERENCES device(device_id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES tag(tag_id) ON DELETE CASCADE,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (device_id, tag_id)
+);
+
+-- Apps
+CREATE TABLE app (
+    app_id SERIAL PRIMARY KEY,
+    package_name VARCHAR(255) NOT NULL UNIQUE,
+    app_name VARCHAR(255) NOT NULL,
+    version VARCHAR(50),
+    publisher VARCHAR(100),
+    description TEXT
+);
+
+-- Apps installed on devices
+CREATE TABLE device_app (
+    device_id INTEGER NOT NULL REFERENCES device(device_id) ON DELETE CASCADE,
+    app_id INTEGER NOT NULL REFERENCES app(app_id) ON DELETE CASCADE,
+    installed_version VARCHAR(50),
+    install_status VARCHAR(30) NOT NULL DEFAULT 'installed',
+    installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uninstalled_at TIMESTAMP,
+    PRIMARY KEY (device_id, app_id)
+);
+
+-- Device Commands
+CREATE TABLE device_command (
+    command_id SERIAL PRIMARY KEY,
+    command_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    command_payload JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE device_command_history (
+    history_id SERIAL PRIMARY KEY,
+    device_id INTEGER NOT NULL REFERENCES device(device_id) ON DELETE CASCADE,
+    command_id INTEGER NOT NULL REFERENCES device_command(command_id) ON DELETE CASCADE,
+    issued_by_user_id INTEGER NOT NULL REFERENCES "user"(user_id),
+    status VARCHAR(20) NOT NULL,
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    response_payload JSONB
+);
+
+-- Daily App Usage
+CREATE TABLE app_daily_usage (
+    usage_id SERIAL PRIMARY KEY,
+    device_id INTEGER NOT NULL REFERENCES device(device_id) ON DELETE CASCADE,
+    app_id INTEGER NOT NULL REFERENCES app(app_id) ON DELETE CASCADE,
+    usage_date DATE NOT NULL,
+    usage_duration INTEGER NOT NULL,
+    additional_info JSONB,
+    UNIQUE (device_id, app_id, usage_date)
+);
