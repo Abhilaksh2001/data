@@ -1,0 +1,140 @@
+
+write me a query to list all the devices enrolled by certain user having userId of admin that has app duration of at least 2hrs / day from 1st jan 2025 to 1st march,2025
+
+Here is a SQL query to list all devices enrolled by the user with user_id = 'admin' that have at least one app with a usage duration of 2 hours (7200 seconds) or more per day, between January 1, 2025 and March 1, 2025:
+
+sql
+CopyInsert
+SELECT DISTINCT d.device_id, d.serial_number, d.model, d.manufacturer
+FROM device d
+JOIN app_daily_usage adu
+  ON d.device_id = adu.device_id
+WHERE d.assigned_user_id = 'admin'
+  AND adu.usage_date >= '2025-01-01'
+  AND adu.usage_date < '2025-03-01'
+  AND adu.usage_duration >= 7200;
+Explanation:
+
+d.assigned_user_id = 'admin' selects devices enrolled by the user with user_id 'admin'.
+adu.usage_date filters usage records between Jan 1, 2025 and March 1, 2025 (exclusive).
+adu.usage_duration >= 7200 ensures at least 2 hours of app usage per day.
+DISTINCT ensures each device appears only once, even if multiple apps meet the criteria.
+If you want only devices where every day in the range had at least 2 hours of app usage, or if you want to aggregate by app or more details, please specify!
+
+
+==================
+
+To get a list of all the apps that are installed on devices but have never been used (i.e., no usage records in app_daily_usage), you can use a query that finds installed apps with no corresponding usage entries.
+
+Here is the SQL query:
+
+sql
+CopyInsert
+SELECT 
+    da.device_id, 
+    da.app_id, 
+    a.app_name, 
+    a.package_name
+FROM 
+    device_app da
+JOIN 
+    app a ON da.app_id = a.app_id
+LEFT JOIN 
+    app_daily_usage adu 
+    ON da.device_id = adu.device_id 
+    AND da.app_id = adu.app_id
+WHERE 
+    da.install_status = 'installed'
+    AND adu.usage_id IS NULL;
+Explanation:
+
+device_app lists installed apps on devices.
+LEFT JOIN app_daily_usage tries to find any usage for each installed app.
+adu.usage_id IS NULL filters for apps with no usage records.
+Only apps with install_status = 'installed' are considered.
+This will return all apps (with their details) that are installed on devices but have never been used.
+
+Let me know if you want to filter further (e.g., by device, user, or time period)!
+
+Feedback submitted
+Me
+
+I also want device info
+
+Here’s an updated SQL query that lists all apps installed on devices (but never used), including device information:
+
+sql
+CopyInsert
+SELECT 
+    d.device_id,
+    d.serial_number,
+    d.model,
+    d.manufacturer,
+    a.app_id,
+    a.app_name,
+    a.package_name
+FROM 
+    device_app da
+JOIN 
+    device d ON da.device_id = d.device_id
+JOIN 
+    app a ON da.app_id = a.app_id
+LEFT JOIN 
+    app_daily_usage adu 
+    ON da.device_id = adu.device_id 
+    AND da.app_id = adu.app_id
+WHERE 
+    da.install_status = 'installed'
+    AND adu.usage_id IS NULL;
+Explanation:
+
+Joins device_app, device, and app to get device and app details.
+Left joins app_daily_usage to find apps with no usage.
+Filters to only include installed apps that have never been used.
+This will give you a list of all devices and their installed apps that have never been used. If you want to filter by additional criteria (user, time, etc.), let me know!
+
+Feedback submitted
+Me
+
+write me a query : for each device give the second most used app for the month of april 
+
+Here’s a query to get, for each device, the second most used app (by total usage duration) for April 2025:
+
+sql
+CopyInsert
+WITH app_usage_ranked AS (
+    SELECT
+        d.device_id,
+        a.app_id,
+        a.app_name,
+        SUM(adu.usage_duration) AS total_usage,
+        ROW_NUMBER() OVER (
+            PARTITION BY d.device_id
+            ORDER BY SUM(adu.usage_duration) DESC
+        ) AS usage_rank
+    FROM
+        app_daily_usage adu
+    JOIN
+        app a ON adu.app_id = a.app_id
+    JOIN
+        device d ON adu.device_id = d.device_id
+    WHERE
+        adu.usage_date >= '2025-04-01'
+        AND adu.usage_date < '2025-05-01'
+    GROUP BY
+        d.device_id, a.app_id, a.app_name
+)
+SELECT
+    device_id,
+    app_id,
+    app_name,
+    total_usage
+FROM
+    app_usage_ranked
+WHERE
+    usage_rank = 2;
+Explanation:
+
+The CTE (app_usage_ranked) calculates total usage per app per device for April 2025 and ranks them by usage.
+The final SELECT returns the second most used (usage_rank = 2) app per device, along with its usage.
+Let me know if you want device details (model, serial, etc.) included as well!
